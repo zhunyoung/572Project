@@ -34,10 +34,27 @@ for i in range(len(list_file_subjects)):
     # reverse the order of the columns since the timestamp for the data is descending
     list_df_CGM_Series[i] = list_df_CGM_Series[i][list_df_CGM_Series[i].columns[::-1]]
 
-print(list_df_CGM_Series[0])
-sys.exit()
+# print(list_df_CGM_Series[0])
+# sys.exit()
 
 #FEATURE 1 FROM JIAN
+# list_df_feature1 = []
+# for i in range(len(list_file_subjects)):
+#     list_df_feature1.append(pd.DataFrame(columns=["0 crossing times"]))
+
+
+#     features = []
+
+#     for j in range(list_shapes[i][0]):
+#         data = list_df_CGM_Series[i].values[j]
+#         # generate feature
+#         pass
+#         feature = [1]
+
+#         list_df_feature1[i] = list_df_feature1[i].append(pd.Series(feature, index=list_df_feature1[i].columns), ignore_index=True)
+
+
+
 
 
 #FEATURE 2 FROM LILI
@@ -54,10 +71,13 @@ for i in range(len(list_file_subjects)):
     for j in range(list_shapes[i][0]):
         tempt_event = tempt.loc[j].values
         tempt_fft = abs(fft(tempt_event))/len(tempt_event)
-        T = tempt_fft[range(1,n+1)]/sum(tempt_fft[range(1,n+1)])
+        if pd.isnull(tempt_fft).any():
+            T = [0]*8
+        else:
+            T = tempt_fft[range(1,n+1)]/sum(tempt_fft[range(1,n+1)])
         list_df_FFT_feature2[i] = list_df_FFT_feature2[i].append(pd.Series((T),index=list_df_FFT_feature2[i].columns),ignore_index=True)
 
-# print(list_df_FFT_feature2[0])
+print(list_df_FFT_feature2[0])
 for i in range(len(list_file_subjects)):
     print('Feature 2:\n===============\n')
     print(list_df_FFT_feature2[i], '\n\n\n')
@@ -78,11 +98,11 @@ for i in range(len(list_file_subjects)):
         list_df_feature3[i] = list_df_feature3[i].append(pd.Series(feature, index=list_df_feature3[i].columns), ignore_index=True)
 
 
-for i in range(len(list_file_subjects)):
-    print('Feature 3:\n===============\n')
-    print(list_df_feature3[i], '\n\n\n')
-    result = PCA(np.array(list_df_feature3[i].values, dtype=np.float64))
-    print(result.Wt, '\n')
+# for i in range(len(list_file_subjects)):
+#     print('Feature 3:\n===============\n')
+#     print(list_df_feature3[i], '\n\n\n')
+#     result = PCA(np.array(list_df_feature3[i].values, dtype=np.float64))
+#     print(result.Wt, '\n')
 
 
 
@@ -128,14 +148,19 @@ for i in range(len(list_file_subjects)):
         list_df_feature4[i] = list_df_feature4[i].append(pd.Series([ratio_cat1, ratio_cat2, ratio_cat3, ratio_cat4, ratio_cat5], index=list_df_feature4[i].columns), ignore_index=True)
 
 
-for i in range(len(list_file_subjects)):
-    print('Feature 4:\n===============\n')
-    print(list_df_feature4[i], '\n\n\n')
+# for i in range(len(list_file_subjects)):
+#     print('Feature 4:\n===============\n')
+#     print(list_df_feature4[i], '\n\n\n')
     # result = PCA(np.array(list_df_feature4[i].values, dtype=np.float64))
     # print(result.Wt, '\n')
 
 ## Merge all features into one feature matrix.
 list_df_feature_matrices = []
 for i in range(len(list_file_subjects)): 
-    df_feature_matrix = pd.concat([list_df_feature1[i], list_df_feature2[i], list_df_feature3[i], list_df_feature4[i]], axis=1)
+    df_feature_matrix = pd.concat([list_df_FFT_feature2[i], list_df_feature3[i], list_df_feature4[i]], axis=1).fillna(0)
     list_df_feature_matrices.append(df_feature_matrix)
+for i in range(len(list_file_subjects)):
+    print('Feature ALL:\n===============\n')
+    print(list_df_feature_matrices[i], '\n\n\n')
+    result = PCA(np.array(list_df_feature_matrices[i].values, dtype=np.float64))
+    print(result.Wt, '\n')
