@@ -134,3 +134,8 @@ for i in range(len(list_file_subjects)):
     # result = PCA(np.array(list_df_feature4[i].values, dtype=np.float64))
     # print(result.Wt, '\n')
 
+## Merge all features into one feature matrix.
+list_df_feature_matrices = []
+for i in range(len(list_file_subjects)): 
+    df_feature_matrix = pd.concat([list_df_feature1[i], list_df_feature2[i], list_df_feature3[i], list_df_feature4[i]], axis=1)
+    list_df_feature_matrices.append(df_feature_matrix)
