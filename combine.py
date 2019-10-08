@@ -2,7 +2,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.mlab import PCA
+# from matplotlib.mlab import PCA
+from sklearn.decomposition import PCA
 from scipy.fftpack import fft
 plt.rcParams["figure.figsize"] = (20,10)
 import sys
@@ -38,23 +39,60 @@ for i in range(len(list_file_subjects)):
 # sys.exit()
 
 #FEATURE 1 FROM JIAN
-# list_df_feature1 = []
-# for i in range(len(list_file_subjects)):
-#     list_df_feature1.append(pd.DataFrame(columns=["0 crossing times"]))
+list_df_CGM_Series_feature1 = []
+for file_subject in list_file_subjects:
+    df_CGM_Series = pd.read_csv(path + file_CGM_Series + file_subject)
+    list_df_CGM_Series_feature1.append(df_CGM_Series)
 
+# Need to apply the data to interploation 
+for i in range(len(list_file_subjects)):
+    # Linear Interpolation 
+    list_df_CGM_Series_feature1[i] = list_df_CGM_Series_feature1[i].interpolate(axis=1, limit=60, limit_direction='both')
 
-#     features = []
-
-#     for j in range(list_shapes[i][0]):
-#         data = list_df_CGM_Series[i].values[j]
-#         # generate feature
-#         pass
-#         feature = [1]
-
-#         list_df_feature1[i] = list_df_feature1[i].append(pd.Series(feature, index=list_df_feature1[i].columns), ignore_index=True)
-
-
-
+list_df_Time_Series = []
+for time_subjects in list_file_subjects:
+    df_Time_Series = pd.read_csv(path + file_CGM_Datenum + time_subjects)
+    list_df_Time_Series.append(df_Time_Series)
+list_df_Zerocrossing_feature1 = []
+for i in range(len(list_file_subjects)):
+    list_df_Zerocrossing_feature1.append(pd.DataFrame(columns=["Zero crossing time"]))
+    
+for i in range (0,5):
+    numrows = list_shapes[i][0]
+    for j in range(0,numrows):
+        if(i==1 and j==16):
+            list_df_Zerocrossing_feature1[i] = list_df_Zerocrossing_feature1[i].append(pd.Series([0], index=list_df_Zerocrossing_feature1[i].columns),ignore_index=True)
+            # print(i,j)
+            continue
+        elif(i==2 and j ==0):
+            list_df_Zerocrossing_feature1[i] = list_df_Zerocrossing_feature1[i].append(pd.Series([0], index=list_df_Zerocrossing_feature1[i].columns),ignore_index=True)
+            # print(i,j)
+            continue
+        elif(i==2 and j ==9):
+            list_df_Zerocrossing_feature1[i] = list_df_Zerocrossing_feature1[i].append(pd.Series([0], index=list_df_Zerocrossing_feature1[i].columns),ignore_index=True)
+            # print(i,j)
+            continue
+        elif(i==2 and j ==24):
+            list_df_Zerocrossing_feature1[i] = list_df_Zerocrossing_feature1[i].append(pd.Series([0], index=list_df_Zerocrossing_feature1[i].columns),ignore_index=True)
+            # print(i,j)
+            continue
+        elif(i==2 and j ==72):
+            list_df_Zerocrossing_feature1[i] = list_df_Zerocrossing_feature1[i].append(pd.Series([0], index=list_df_Zerocrossing_feature1[i].columns),ignore_index=True)
+            # print(i,j)
+            continue
+        for k in range(0,31):
+            if((list_df_CGM_Series_feature1[i].iat[j,k]-list_df_CGM_Series_feature1[i].iat[j,k+1])*(list_df_CGM_Series_feature1[i].iat[j,k+1]-list_df_CGM_Series_feature1[i].iat[j,k+2])<0):
+                list_df_Zerocrossing_feature1[i] = list_df_Zerocrossing_feature1[i].append(pd.Series([list_df_Time_Series[i].iat[j,k]-list_df_Time_Series[i].iat[j,30]], index=list_df_Zerocrossing_feature1[i].columns),ignore_index=True)
+                # print(i,j,k)
+                break
+         
+            elif((list_df_CGM_Series_feature1[i].iat[j,k]-list_df_CGM_Series_feature1[i].iat[j,k+1])*(list_df_CGM_Series_feature1[i].iat[j,k+2]-list_df_CGM_Series_feature1[i].iat[j,k+3])<=0):
+                list_df_Zerocrossing_feature1[i] = list_df_Zerocrossing_feature1[i].append(pd.Series([list_df_Time_Series[i].iat[j,k]-list_df_Time_Series[i].iat[j,30]], index=list_df_Zerocrossing_feature1[i].columns),ignore_index=True)
+                # print(i,j,k)
+                break
+for i in range(len(list_file_subjects)):
+    print('Feature 1:\n===============\n')
+    print(list_df_Zerocrossing_feature1[i], '\n\n\n')
 
 
 #FEATURE 2 FROM LILI
@@ -157,10 +195,18 @@ for i in range(len(list_file_subjects)):
 ## Merge all features into one feature matrix.
 list_df_feature_matrices = []
 for i in range(len(list_file_subjects)): 
-    df_feature_matrix = pd.concat([list_df_FFT_feature2[i], list_df_feature3[i], list_df_feature4[i]], axis=1).fillna(0)
+    df_feature_matrix = pd.concat([list_df_Zerocrossing_feature1[i], list_df_FFT_feature2[i], list_df_feature3[i], list_df_feature4[i]], axis=1).fillna(0)
     list_df_feature_matrices.append(df_feature_matrix)
 for i in range(len(list_file_subjects)):
     print('Feature ALL:\n===============\n')
     print(list_df_feature_matrices[i], '\n\n\n')
-    result = PCA(np.array(list_df_feature_matrices[i].values, dtype=np.float64))
-    print(result.Wt, '\n')
+    pca = PCA(n_components=5,whiten=True)
+    # pca.fit(np.array(list_df_feature_matrices[i].values))
+    newdata = pca.fit_transform(np.array(list_df_feature_matrices[i].values))
+    #print(pca)
+    print(newdata)
+    print(newdata.shape)
+    print(pca.explained_variance_)
+    print(pca.explained_variance_ratio_)
+    # result = PCA(np.array(list_df_feature_matrices[i].values, dtype=np.float64, standardize=False))
+    # print(result.Wt, '\n')
