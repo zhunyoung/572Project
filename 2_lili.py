@@ -1,8 +1,38 @@
+""" 
+1. To test on the given dataset:
+
+python 2.py
+
+whose expected output is: (note that the best params may change for different runs)
+
+    Best params for random forest: {'max_depth': 90, 'min_samples_leaf': 10, 'n_estimators': 30}
+    We first use 80% of data to train the model and then predict on the remaining 20% of data...
+    Accuracy on validation data (20% of all data) after hypertuning for Random Forest:0.626263
+
+2. To make prediction on a given file, e.g., MealNoMealData/mealData1.csv
+
+python 2.py -file MealNoMealData/mealData1.csv
+
+whose expected output is:
+
+    Best params for random forest: {'max_depth': 60, 'min_samples_leaf': 10, 'n_estimators': 20}
+    We first use 80% of data to train the model and then predict on the remaining 20% of data...
+    Accuracy on validation data (20% of all data) after hypertuning for Random Forest:0.636364
+
+    Then, let's predict the labels for the given file...
+    [1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 0. 1. 1. 1. 0. 0. 1. 1. 1.
+     1. 1. 1. 1. 1. 1. 1. 1. 0. 0. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 0. 1. 1.]
+
+"""
+
+import argparse
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.mlab import PCA
-plt.rcParams["figure.figsize"] = (20,10)
+from sklearn.decomposition import PCA
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from scipy.fftpack import fft
 import sys
 
 
@@ -33,13 +63,13 @@ def featureExtraction(df):
     ###################
     #### Feature 2 ####
     ###################
-    feature2 = pd.DataFrame(columns=["8", "7", "6", "5", "4", "3", "2", "1"])
+    feature2 = pd.DataFrame(columns=["8","7","6","5","4", "3", "2", "1"])
     i2 = 0
     while i2 < len(df):
         tempt2 = df.iloc[i2].values
         tempt2_fft = np.abs(fft(tempt2))/len(tempt2)
         T2 = tempt2_fft[range(1,9)]/sum(tempt2_fft[range(1,9)])
-        feature2 = feature2.append(pd.Series((T),index=feature2.columns),ignore_index=True)
+        feature2 = feature2.append(pd.Series((T2),index=feature2.columns),ignore_index=True)
 
     ###################
     #### Feature 3 #### 
@@ -65,62 +95,122 @@ def featureExtraction(df):
 def df2path(df, path):
     df.to_csv(path, encoding='utf-8', index=False)
 
-# PCA
-def zeroMean(dataMat):
-    # remove the mean value for each column.
-    meanVal = np.mean(dataMat, axis=0)
-    newData = dataMat - meanVal
-    return newData, meanVal
+# apply PCA to features
+def applyPCA(df, pca):
+    return pca.transform(df)
 
-def pca(dataMat,n):
-    # pca calculation, n is usually 5 in our project.
-    newData,mealVal = zeroMean(dataMat)
-    covMat = np.cov(newData,rowvar=0)
-    eigVals,eigVects = np.linalg.eig(np.mat(covMat)) # get eigen values & eigen vectors
-    eigValIndice = np.argsort(eigVals)
-    n_eigValIndice = eigValIndice[-1:-(n+1):-1]
-    #print(n_eigValIndice)
-    n_eigVect = eigVects[:,n_eigValIndice]
-    return n_eigVect # return top 5 feature vectors.
 
-# KNN
-def euclidean_distance(row1, row2):
-    distance = 0.0
-    for i in range(len(row1)):
-        distance += (row1[i] - row2[i])**2
-    return sqrt(distance)
+def main():
+    parser = argparse.ArgumentParser(description='CSE572 Project 2')
+    parser.add_argument('-file', required=False, type=str, default='')
+    args = parser.parse_args()
 
-# Locate the most similar neighbors
-def get_neighbors(train, test_row, num_neighbors):
-    distances = []
-    for train_row in train:
-        dist = euclidean_distance(test_row, train_row)
-        distances.append((train_row,dist))
-    distances.sort(key=lambda tup: tup[1])
-    neighbors = []
-    for i in range(num_neighbors):
-        neighbors.append(distances[i][0])
-    return neighbors
+    # PATH
+    subjects = ['1', '2', '3', '4', '5']
+    categories = ['Meal', 'Nomeal']
+    pathList = {}
+    pathList['Meal'] = ['MealNoMealData/mealData'+i+'.csv' for i in subjects]
+    pathList['Nomeal'] = ['MealNoMealData/Nomeal'+i+'.csv' for i in subjects]
 
-# KNN
-def knn(train, test_row, num_neighbors):
-    neighbors = get_neighbors(train, test_row, num_neighbors)
-    output_values = [row[-1] for row in neighbors]
-    prediction = max(set(output_values), key=output_values.count)
-    return prediction
+    # Extract features from the data for each category
+    CGMSeries = {}
+    for c in categories:
+        CGMSeries[c] = files2df(pathList[c])
+        CGMSeries[c] = featureExtraction(CGMSeries[c])
 
-# PATH
-subjects = ['1', '2', '3', '4', '5']
-categories = ['Meal', 'Nomeal']
-pathList = {}
-pathList['Meal'] = ['MealNoMealData/mealData'+i+'.csv' for i in subjects]
-pathList['NoMeal'] = ['MealNoMealData/Nomeal'+i+'.csv' for i in subjects]
+    # Apply PCA
+    n_components = 5
+    pca = PCA(n_components=n_components, whiten=True)
+    # fit PCA with only Meal data
+    pca.fit(CGMSeries['Meal'])
 
-# Extract features from the data for each catogery
-CGMSeries = {}
-for c in categories:
-    CGMSeries[c] = files2df(pathList[c])
-    CGMSeries[c] = featureExtraction(CGMSeries[c])
-    # store the features in a csv file
-    df2path(CGMSeries[c], c+'.csv')
-    print(CGMSeries[c])
+    ##################
+    # get all data for training and testing
+    ##################
+
+    # modifying features by applying pca and adding label
+    CGMSeriesPCA = {}
+    for c in categories:
+        if c == 'Meal':
+            CGMSeriesPCA[c] = np.ones((len(CGMSeries[c].index), n_components+1))
+        elif c == 'Nomeal':
+            CGMSeriesPCA[c] = np.zeros((len(CGMSeries[c].index), n_components+1))
+        else:
+            print('Error!')
+        CGMSeriesPCA[c][:,:-1] = pca.transform(CGMSeries[c])
+
+    # combine the 2 data with 2 labels, random the order
+    allData = np.concatenate((CGMSeriesPCA['Meal'], CGMSeriesPCA['Nomeal']), axis=0)
+    np.random.shuffle(allData)
+
+    ##################
+    # train a model: random forest
+    ##################
+
+    # Note that I don't split training and validation data since I will use 
+    # sklearn 'grid search with cross validation' function to find the optimal hyper-parameters
+    X_train = allData[:,:-1]
+    y_train = allData[:,-1]
+    print(X_train,y_train)
+
+    rand_parameters={'n_estimators': [10,20,30], 'min_samples_leaf': range(5,30,5), 'max_depth': range(50,100,10)}
+    rfc = RandomForestClassifier()
+    rfc_grid = GridSearchCV(rfc, rand_parameters, cv=5)
+    rfc_grid.fit(X_train, y_train)
+
+    best_params = rfc_grid.best_params_
+    print('Best params for random forest: {}'.format(best_params))
+    rfc = RandomForestClassifier(**best_params)
+
+    # we use 80% of the data to train again and use 20% of the data for testing
+    print('We first use 80% of data to train the model and then predict on the remaining 20% of data...')
+    idx = int(0.8*len(allData))
+    rfc.fit(X_train[:idx,:], y_train[:idx])
+    # y_predict = rfc.predict(X_train[idx:,:])
+    print('Accuracy on validation data (20% of all data) after hypertuning for Random Forest:{0:6f}'.format(rfc.score(X_train[idx:,:],y_train[idx:])))
+
+    # if input file is given, we use all the data for training and predict on the csv file
+    if args.file != '':
+        print('\nThen, let\'s predict the labels for the given file...')
+        rfc.fit(X_train, y_train)
+        try:
+            df = file2df(args.file)
+        except:
+            print('Error! The input file {} cannot be read as a csv file'.format(args.file))
+            sys.exit()
+        df = featureExtraction(df)
+        X_test = pca.transform(df)
+        y_predict = rfc.predict(X_test)
+        print(y_predict)
+        
+    ####################
+    # Model -- KNN
+    ####################
+    # KNN
+    def euclidean_distance(row1, row2):
+        distance = 0.0
+        for i in range(len(row1)):
+            distance += (row1[i] - row2[i])**2
+        return sqrt(distance)
+
+    # Locate the most similar neighbors
+    def get_neighbors(train, test_row, num_neighbors):
+        distances = []
+        for train_row in train:
+            dist = euclidean_distance(test_row, train_row)
+            distances.append((train_row,dist))
+        distances.sort(key=lambda tup: tup[1])
+        neighbors = []
+        for i in range(num_neighbors):
+            neighbors.append(distances[i][0])
+        return neighbors
+
+    # KNN
+    def knn(train, test_row, num_neighbors):
+        neighbors = get_neighbors(train, test_row, num_neighbors)
+        output_values = [row[-1] for row in neighbors]
+        prediction = max(set(output_values), key=output_values.count)
+        return prediction
+  
+if __name__== "__main__":
+    main()
